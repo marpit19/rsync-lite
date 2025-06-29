@@ -6,6 +6,7 @@ use std::{
 };
 
 use clap::{Command, arg};
+use filetime::FileTime;
 
 fn main() {
     let matches = Command::new("rsync-lite")
@@ -47,6 +48,13 @@ fn main() {
 
 fn transfer_file(src: &Path, dest: &Path) -> Result<(), Error> {
     fs::copy(src, dest)?;
+
+    let metadata = fs::metadata(src)?;
+    fs::set_permissions(dest, metadata.permissions())?;
+
+    let modification_time = FileTime::from_last_modification_time(&metadata);
+    filetime::set_file_mtime(dest, modification_time)?;
+
     println!("Copied file: {} -> {}", src.display(), dest.display());
     Ok(())
 }
@@ -55,8 +63,33 @@ fn copy_directory_structure(src: &Path, dest: &Path) -> Result<(), Error> {
     for entry in read_dir(src)? {
         let entry = entry?;
         let path = entry.path();
+        let file_type = entry.file_type()?;
 
-        if path.is_dir() {
+        if file_type.is_symlink() {
+            let file_name = path
+                .file_name()
+                .ok_or_else(|| Error::new(std::io::ErrorKind::InvalidInput, "Invalid file name"))?;
+
+            let link_target = fs::read_link(&path)?;
+            let dest_link = dest.join(file_name);
+
+            #[cfg(unix)]
+            std::os::unix::fs::symlink(&link_target, &dest_link)?;
+
+            #[cfg(windows)]
+            {
+                if link_target.is_dir() {
+                    std::os::windows::fs::symlink_dir(&link_target, &dest_link)?;
+                } else {
+                    std::os::windows::fs::symlink_file(&link_target, &dest_link)?;
+                }
+            }
+            println!(
+                "Copied symlink: {} -> {}",
+                path.display(),
+                dest_link.display()
+            );
+        } else if path.is_dir() {
             let dir_name = path.file_name().ok_or_else(|| {
                 Error::new(std::io::ErrorKind::InvalidInput, "Invalid directory name")
             })?;
