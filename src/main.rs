@@ -1,4 +1,4 @@
-use std::{fs, process};
+use std::{fs, path::Path, process};
 
 use clap::{Command, arg};
 
@@ -10,8 +10,8 @@ fn main() {
         .arg(arg!(--dest <VALUE>).required(true))
         .get_matches();
 
-    let src = matches.get_one::<String>("src").expect("src is required");
-    let dest = matches.get_one::<String>("dest").expect("dest is required");
+    let src = Path::new(matches.get_one::<String>("src").expect("src is required"));
+    let dest = Path::new(matches.get_one::<String>("dest").expect("dest is required"));
 
     match transfer_file(src, dest) {
         Ok(msg) => println!("{}", msg),
@@ -22,11 +22,13 @@ fn main() {
     }
 }
 
-fn transfer_file(src: &str, dest: &str) -> Result<String, String> {
-    match fs::copy(src,dest) {
+fn transfer_file(src: &Path, dest: &Path) -> Result<String, String> {
+    match fs::copy(src, dest) {
         Ok(bytes_copied) => Ok(format!(
             "total bytes copied from {} to {}: {}",
-            src, dest, bytes_copied
+            src.display(),
+            dest.display(),
+            bytes_copied
         )),
         Err(e) => Err(format!("Transfer failed: {}", e)),
     }
