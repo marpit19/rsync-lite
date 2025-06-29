@@ -1,16 +1,19 @@
-use std::{env, fs, process};
+use std::{fs, process};
+
+use clap::{Command, arg};
 
 fn main() {
-    // GOAL: copy a single file from source to destination
-    println!("copy a single file from source to destination");
+    let matches = Command::new("rsync-lite")
+        .version("0.1")
+        .about("copies a single file from source to destination")
+        .arg(arg!(--src <VALUE>).required(true))
+        .arg(arg!(--dest <VALUE>).required(true))
+        .get_matches();
 
-    let args: Vec<String> = env::args().collect();
-    if args.len() != 3 {
-        eprintln!("Usage: {} <src> <dest>", args[0]);
-        process::exit(1);
-    }
+    let src = matches.get_one::<String>("src").expect("src is required");
+    let dest = matches.get_one::<String>("dest").expect("dest is required");
 
-    match transfer_file(&args[1], &args[2]) {
+    match transfer_file(src, dest) {
         Ok(msg) => println!("{}", msg),
         Err(err) => {
             eprintln!("Error: {}", err);
@@ -20,7 +23,7 @@ fn main() {
 }
 
 fn transfer_file(src: &str, dest: &str) -> Result<String, String> {
-    match fs::copy(src, dest) {
+    match fs::copy(src,dest) {
         Ok(bytes_copied) => Ok(format!(
             "total bytes copied from {} to {}: {}",
             src, dest, bytes_copied
